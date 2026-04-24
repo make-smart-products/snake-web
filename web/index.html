@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake Game on Go</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Snake Game</h1>
+      <p class="subtitle">Go backend + Web frontend</p>
+
+      <section class="hud">
+        <div>Счет: <span id="score">0</span></div>
+        <div>Рекорд: <span id="best-score">0</span></div>
+      </section>
+
+      <section class="difficulty-panel">
+        <label for="difficulty">Сложность:</label>
+        <select id="difficulty">
+          <option value="easy">Легкая</option>
+          <option value="normal" selected>Нормальная</option>
+          <option value="hard">Сложная</option>
+        </select>
+      </section>
+
+      <canvas id="board" width="480" height="480"></canvas>
+
+      <section class="controls">
+        <button id="start-btn" type="button">Старт</button>
+        <button id="pause-btn" type="button">Пауза</button>
+        <button id="restart-btn" type="button">Рестарт</button>
+      </section>
+
+      <p id="status" class="status">Нажмите "Старт", чтобы начать игру.</p>
+      <p class="hint">Управление: стрелки, WASD или свайпы на мобильном</p>
+
+      <section class="records">
+        <h2>Топ-5 результатов</h2>
+        <ol id="top-scores"></ol>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
