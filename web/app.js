@@ -29,6 +29,7 @@ const topScoresStorageKey = "snake_top_scores";
 const snakeThemeStorageKey = "snake_theme";
 const soundStorageKey = "snake_sound_enabled";
 const playerNameStorageKey = "snake_player_name";
+const resetStatsPassword = "2026";
 const maxLevel = 10;
 const pointsPerLevel = 100;
 const bonusEveryFoods = 5;
@@ -1165,6 +1166,14 @@ soundBtn.addEventListener("click", () => {
 });
 
 resetStatsBtn.addEventListener("click", () => {
+  const enteredPassword = window.prompt("Введите пароль для сброса статистики:");
+  if (enteredPassword === null) return;
+
+  if (enteredPassword !== resetStatsPassword) {
+    statusNode.textContent = "Неверный пароль. Статистика не сброшена.";
+    return;
+  }
+
   if (window.confirm("Сбросить рекорд, топ результатов и сохраненное имя игрока?")) {
     resetStatistics();
   }
