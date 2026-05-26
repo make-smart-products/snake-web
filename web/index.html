@@ -3,38 +3,59 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Snake Game on Go</title>
+    <title>Neon Snake</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="app">
-      <h1>Snake Game</h1>
-      <p class="subtitle">Go backend + Web frontend</p>
+      <section class="hero">
+        <p class="eyebrow">Arcade mode</p>
+        <h1>Neon Snake</h1>
+        <p class="subtitle">Классическая змейка с динамической скоростью, бонусами и новым визуальным стилем.</p>
+      </section>
 
       <section class="hud">
-        <div>Счет: <span id="score">0</span></div>
-        <div>Рекорд: <span id="best-score">0</span></div>
+        <div class="hud-card">
+          <span class="hud-label">Счет</span>
+          <strong id="score">0</strong>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Рекорд</span>
+          <strong id="best-score">0</strong>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Уровень</span>
+          <strong id="level">1</strong>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Скорость</span>
+          <strong id="speed">120ms</strong>
+        </div>
       </section>
 
-      <section class="difficulty-panel">
-        <label for="difficulty">Сложность:</label>
-        <select id="difficulty">
-          <option value="easy">Легкая</option>
-          <option value="normal" selected>Нормальная</option>
-          <option value="hard">Сложная</option>
-        </select>
-      </section>
+      <section class="game-shell" aria-label="Игровое поле">
+        <div class="difficulty-panel">
+          <label for="difficulty">Сложность</label>
+          <select id="difficulty">
+            <option value="easy">Легкая</option>
+            <option value="normal" selected>Нормальная</option>
+            <option value="hard">Сложная</option>
+          </select>
+        </div>
 
-      <canvas id="board" width="480" height="480"></canvas>
+        <div class="board-frame">
+          <canvas id="board" width="480" height="480"></canvas>
+        </div>
+      </section>
 
       <section class="controls">
         <button id="start-btn" type="button">Старт</button>
-        <button id="pause-btn" type="button">Пауза</button>
-        <button id="restart-btn" type="button">Рестарт</button>
+        <button id="pause-btn" type="button" class="secondary">Пауза</button>
+        <button id="restart-btn" type="button" class="secondary">Рестарт</button>
       </section>
 
       <p id="status" class="status">Нажмите "Старт", чтобы начать игру.</p>
-      <p class="hint">Управление: стрелки, WASD или свайпы на мобильном</p>
+      <p class="hint">Управление: стрелки, WASD или свайпы. Золотой бонус дает больше очков и исчезает быстро.</p>
 
       <section class="records">
         <h2>Топ-5 результатов</h2>
