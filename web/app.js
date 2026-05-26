@@ -77,6 +77,9 @@ const snakePalettes = {
   },
 };
 const noteFrequencies = {
+  G3: 196,
+  A3: 220,
+  B3: 246.94,
   C4: 261.63,
   D4: 293.66,
   E4: 329.63,
@@ -85,6 +88,8 @@ const noteFrequencies = {
   A4: 440,
   B4: 493.88,
   C5: 523.25,
+  D5: 587.33,
+  E5: 659.25,
 };
 const odeToJoyMelody = [
   ["E4", 1],
@@ -117,8 +122,86 @@ const odeToJoyMelody = [
   ["D4", 1.5],
   ["C4", 0.5],
   ["C4", 2],
+  ["D4", 1],
+  ["D4", 1],
+  ["E4", 1],
+  ["C4", 1],
+  ["D4", 1],
+  ["E4", 0.5],
+  ["F4", 0.5],
+  ["E4", 1],
+  ["C4", 1],
+  ["D4", 1],
+  ["E4", 0.5],
+  ["F4", 0.5],
+  ["E4", 1],
+  ["D4", 1],
+  ["C4", 1],
+  ["D4", 1],
+  ["G3", 2],
+  ["E4", 1],
+  ["E4", 1],
+  ["F4", 1],
+  ["G4", 1],
+  ["G4", 1],
+  ["F4", 1],
+  ["E4", 1],
+  ["D4", 1],
+  ["C4", 1],
+  ["C4", 1],
+  ["D4", 1],
+  ["E4", 1],
+  ["D4", 1.5],
+  ["C4", 0.5],
+  ["C4", 2],
+  ["G4", 1],
+  ["G4", 1],
+  ["A4", 1],
+  ["B4", 1],
+  ["C5", 1],
+  ["B4", 1],
+  ["A4", 1],
+  ["G4", 1],
+  ["F4", 1],
+  ["E4", 1],
+  ["D4", 1],
+  ["C4", 1],
+  ["D4", 2],
+  ["E4", 2],
+  ["E4", 1],
+  ["E4", 1],
+  ["F4", 1],
+  ["G4", 1],
+  ["G4", 1],
+  ["F4", 1],
+  ["E4", 1],
+  ["D4", 1],
+  ["C4", 1],
+  ["C4", 1],
+  ["D4", 1],
+  ["E4", 1],
+  ["E4", 1.5],
+  ["D4", 0.5],
+  ["D4", 2],
+  ["E4", 1],
+  ["E4", 1],
+  ["F4", 1],
+  ["G4", 1],
+  ["G4", 1],
+  ["F4", 1],
+  ["E4", 1],
+  ["D4", 1],
+  ["C4", 1],
+  ["C4", 1],
+  ["D4", 1],
+  ["E4", 1],
+  ["D4", 1.5],
+  ["C4", 0.5],
+  ["C4", 2],
 ];
 const musicBeatMs = 360;
+const holdBoostDelayMs = 2000;
+const holdBoostMultiplier = 0.55;
 
 let snake = [{ x: 10, y: 10 }];
 let previousSnake = [{ x: 10, y: 10 }];
@@ -149,6 +232,9 @@ let isSoundEnabled = localStorage.getItem(soundStorageKey) !== "false";
 let lastMoveSoundAt = 0;
 let pendingRecordScore = null;
 let isVictory = false;
+let heldDirectionKey = null;
+let holdBoostTimerId = null;
+let isHoldBoostActive = false;
 
 const savedSnakeTheme = localStorage.getItem(snakeThemeStorageKey);
 if (savedSnakeTheme && snakePalettes[savedSnakeTheme]) {
@@ -161,7 +247,9 @@ updateSoundButton();
 
 function getTickMs() {
   const baseSpeed = levelSpeeds[Math.min(level - 1, levelSpeeds.length - 1)] || levelSpeeds[0];
-  return baseSpeed;
+  if (!isHoldBoostActive) return baseSpeed;
+
+  return Math.max(40, Math.round(baseSpeed * holdBoostMultiplier));
 }
 
 function getSnakePalette() {
@@ -172,7 +260,7 @@ function updateHud() {
   scoreNode.textContent = String(score);
   bestScoreNode.textContent = String(bestScore);
   levelNode.textContent = String(level);
-  speedNode.textContent = `${getTickMs()}ms`;
+  speedNode.textContent = `${getTickMs()}ms${isHoldBoostActive ? " x2" : ""}`;
   levelProgressNode.textContent = `${Math.min(levelScore, pointsPerLevel)}/${pointsPerLevel}`;
 }
 
@@ -293,6 +381,44 @@ function restartLoop() {
   lastStepAt = performance.now();
   gameLoopId = setInterval(update, getTickMs());
   startRenderLoop();
+}
+
+function clearHoldBoost(message) {
+  if (holdBoostTimerId) {
+    clearTimeout(holdBoostTimerId);
+    holdBoostTimerId = null;
+  }
+
+  heldDirectionKey = null;
+
+  if (!isHoldBoostActive) return;
+
+  isHoldBoostActive = false;
+  updateHud();
+  restartLoop();
+  if (message) statusNode.textContent = message;
+}
+
+function beginDirectionHold(directionKey) {
+  if (!isRunning || isPaused) return;
+  if (!directionKey || heldDirectionKey === directionKey) return;
+
+  clearHoldBoost();
+  heldDirectionKey = directionKey;
+  holdBoostTimerId = setTimeout(() => {
+    if (heldDirectionKey !== directionKey) return;
+
+    isHoldBoostActive = true;
+    holdBoostTimerId = null;
+    updateHud();
+    restartLoop();
+    statusNode.textContent = "Ускорение включено: стрелка удерживается больше 2 секунд.";
+  }, holdBoostDelayMs);
+}
+
+function endDirectionHold(directionKey) {
+  if (directionKey && heldDirectionKey !== directionKey) return;
+  clearHoldBoost(isRunning && !isPaused ? `Игра идет: уровень ${level}.` : "");
 }
 
 function updateSoundButton() {
@@ -683,6 +809,7 @@ function update() {
 
 function gameOver(options = {}) {
   const details = typeof options === "string" ? { message: options } : options;
+  clearHoldBoost();
   stopLoop();
   stopRenderLoop();
   stopBackgroundMusic();
@@ -709,6 +836,7 @@ function gameOver(options = {}) {
 }
 
 function showVictory() {
+  clearHoldBoost();
   stopLoop();
   stopRenderLoop();
   stopBackgroundMusic();
@@ -768,6 +896,7 @@ function pauseGame() {
   }
 
   isPaused = true;
+  clearHoldBoost();
   statusNode.textContent = "Пауза";
   stopLoop();
   stopRenderLoop();
@@ -777,6 +906,7 @@ function pauseGame() {
 function resetGame() {
   hideRecordModal();
   hideVictoryModal();
+  clearHoldBoost();
   stopLoop();
   stopRenderLoop();
   isRunning = false;
@@ -918,9 +1048,25 @@ function setDirection(key) {
   return false;
 }
 
+function getDirectionHoldKey(key) {
+  if (key === "ArrowUp" || key === "w") return "ArrowUp";
+  if (key === "ArrowDown" || key === "s") return "ArrowDown";
+  if (key === "ArrowLeft" || key === "a") return "ArrowLeft";
+  if (key === "ArrowRight" || key === "d") return "ArrowRight";
+  return null;
+}
+
 document.addEventListener("keydown", (event) => {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-  if (setDirection(key)) event.preventDefault();
+  if (setDirection(key)) {
+    event.preventDefault();
+    if (!event.repeat) beginDirectionHold(getDirectionHoldKey(key));
+  }
+});
+
+document.addEventListener("keyup", (event) => {
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  endDirectionHold(getDirectionHoldKey(key));
 });
 
 function handleScreenControlPress(event, button) {
@@ -937,11 +1083,30 @@ function handleScreenControlPress(event, button) {
   button.blur();
 }
 
+function beginScreenControlHold(event, button) {
+  handleScreenControlPress(event, button);
+  beginDirectionHold(button.dataset.direction);
+}
+
+function endScreenControlHold(event, button) {
+  event.preventDefault();
+  event.stopPropagation();
+  endDirectionHold(button.dataset.direction);
+}
+
 screenControlButtons.forEach((button) => {
   if (window.PointerEvent) {
-    button.addEventListener("pointerdown", (event) => handleScreenControlPress(event, button));
+    button.addEventListener("pointerdown", (event) => {
+      beginScreenControlHold(event, button);
+      if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
+    });
+    button.addEventListener("pointerup", (event) => endScreenControlHold(event, button));
+    button.addEventListener("pointercancel", (event) => endScreenControlHold(event, button));
+    button.addEventListener("pointerleave", (event) => endScreenControlHold(event, button));
   } else {
-    button.addEventListener("touchstart", (event) => handleScreenControlPress(event, button), { passive: false });
+    button.addEventListener("touchstart", (event) => beginScreenControlHold(event, button), { passive: false });
+    button.addEventListener("touchend", (event) => endScreenControlHold(event, button), { passive: false });
+    button.addEventListener("touchcancel", (event) => endScreenControlHold(event, button), { passive: false });
   }
 
   button.addEventListener("click", (event) => handleScreenControlPress(event, button));
