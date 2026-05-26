@@ -75,130 +75,6 @@ const snakePalettes = {
     eye: "#451a03",
   },
 };
-const noteFrequencies = {
-  G3: 196,
-  A3: 220,
-  B3: 246.94,
-  C4: 261.63,
-  D4: 293.66,
-  E4: 329.63,
-  F4: 349.23,
-  G4: 392,
-  A4: 440,
-  B4: 493.88,
-  C5: 523.25,
-  D5: 587.33,
-  E5: 659.25,
-};
-const odeToJoyMelody = [
-  ["E4", 1],
-  ["E4", 1],
-  ["F4", 1],
-  ["G4", 1],
-  ["G4", 1],
-  ["F4", 1],
-  ["E4", 1],
-  ["D4", 1],
-  ["C4", 1],
-  ["C4", 1],
-  ["D4", 1],
-  ["E4", 1],
-  ["E4", 1.5],
-  ["D4", 0.5],
-  ["D4", 2],
-  ["E4", 1],
-  ["E4", 1],
-  ["F4", 1],
-  ["G4", 1],
-  ["G4", 1],
-  ["F4", 1],
-  ["E4", 1],
-  ["D4", 1],
-  ["C4", 1],
-  ["C4", 1],
-  ["D4", 1],
-  ["E4", 1],
-  ["D4", 1.5],
-  ["C4", 0.5],
-  ["C4", 2],
-  ["D4", 1],
-  ["D4", 1],
-  ["E4", 1],
-  ["C4", 1],
-  ["D4", 1],
-  ["E4", 0.5],
-  ["F4", 0.5],
-  ["E4", 1],
-  ["C4", 1],
-  ["D4", 1],
-  ["E4", 0.5],
-  ["F4", 0.5],
-  ["E4", 1],
-  ["D4", 1],
-  ["C4", 1],
-  ["D4", 1],
-  ["G3", 2],
-  ["E4", 1],
-  ["E4", 1],
-  ["F4", 1],
-  ["G4", 1],
-  ["G4", 1],
-  ["F4", 1],
-  ["E4", 1],
-  ["D4", 1],
-  ["C4", 1],
-  ["C4", 1],
-  ["D4", 1],
-  ["E4", 1],
-  ["D4", 1.5],
-  ["C4", 0.5],
-  ["C4", 2],
-  ["G4", 1],
-  ["G4", 1],
-  ["A4", 1],
-  ["B4", 1],
-  ["C5", 1],
-  ["B4", 1],
-  ["A4", 1],
-  ["G4", 1],
-  ["F4", 1],
-  ["E4", 1],
-  ["D4", 1],
-  ["C4", 1],
-  ["D4", 2],
-  ["E4", 2],
-  ["E4", 1],
-  ["E4", 1],
-  ["F4", 1],
-  ["G4", 1],
-  ["G4", 1],
-  ["F4", 1],
-  ["E4", 1],
-  ["D4", 1],
-  ["C4", 1],
-  ["C4", 1],
-  ["D4", 1],
-  ["E4", 1],
-  ["E4", 1.5],
-  ["D4", 0.5],
-  ["D4", 2],
-  ["E4", 1],
-  ["E4", 1],
-  ["F4", 1],
-  ["G4", 1],
-  ["G4", 1],
-  ["F4", 1],
-  ["E4", 1],
-  ["D4", 1],
-  ["C4", 1],
-  ["C4", 1],
-  ["D4", 1],
-  ["E4", 1],
-  ["D4", 1.5],
-  ["C4", 0.5],
-  ["C4", 2],
-];
-const musicBeatMs = 360;
 const holdBoostDelayMs = 2000;
 const holdBoostMultiplier = 0.55;
 
@@ -226,8 +102,6 @@ let touchStartY = 0;
 let particles = [];
 let lastScreenControlPressAt = 0;
 let audioContext = null;
-let musicTimerId = null;
-let musicNoteIndex = 0;
 let isSoundEnabled = localStorage.getItem(soundStorageKey) !== "false";
 let lastMoveSoundAt = 0;
 let pendingRecordScore = null;
@@ -483,50 +357,10 @@ function playVictorySound() {
   playTone(783.99, 0.24, "triangle", 0.05, 0.3);
 }
 
-function stopBackgroundMusic() {
-  if (musicTimerId) {
-    clearTimeout(musicTimerId);
-    musicTimerId = null;
-  }
-}
-
-function scheduleBackgroundMusic() {
-  if (!isSoundEnabled || !isRunning || isPaused) {
-    stopBackgroundMusic();
-    return;
-  }
-
-  const [noteName, beats] = odeToJoyMelody[musicNoteIndex];
-  const durationMs = musicBeatMs * beats;
-  const frequency = noteFrequencies[noteName];
-
-  if (frequency) {
-    playTone(frequency, Math.max(0.12, durationMs / 1000 - 0.05), "sine", 0.015);
-    playTone(frequency / 2, Math.max(0.12, durationMs / 1000 - 0.05), "triangle", 0.008);
-  }
-
-  musicNoteIndex = (musicNoteIndex + 1) % odeToJoyMelody.length;
-  musicTimerId = setTimeout(scheduleBackgroundMusic, durationMs);
-}
-
-function startBackgroundMusic() {
-  if (!isSoundEnabled || musicTimerId) return;
-
-  getAudioContext();
-  scheduleBackgroundMusic();
-}
-
 function setSoundEnabled(enabled) {
   isSoundEnabled = enabled;
   localStorage.setItem(soundStorageKey, String(isSoundEnabled));
   updateSoundButton();
-
-  if (isSoundEnabled && isRunning && !isPaused) {
-    startBackgroundMusic();
-    return;
-  }
-
-  stopBackgroundMusic();
 }
 
 function roundedRect(x, y, width, height, radius) {
@@ -863,7 +697,6 @@ function gameOver(options = {}) {
   } else {
     stopRenderLoop();
   }
-  stopBackgroundMusic();
   isRunning = false;
   isPaused = false;
   statusNode.textContent = details.message || `Игра окончена. Ваш счет: ${score}. Нажмите "Рестарт".`;
@@ -890,7 +723,6 @@ function showVictory() {
   clearHoldBoost();
   stopLoop();
   stopRenderLoop();
-  stopBackgroundMusic();
   isRunning = false;
   isPaused = false;
   isVictory = true;
@@ -933,7 +765,6 @@ function startGame() {
   isPaused = false;
   statusNode.textContent = `Игра идет: уровень ${level}.`;
   restartLoop();
-  startBackgroundMusic();
 }
 
 function pauseGame() {
@@ -942,7 +773,6 @@ function pauseGame() {
     isPaused = false;
     statusNode.textContent = `Игра идет: уровень ${level}.`;
     restartLoop();
-    startBackgroundMusic();
     return;
   }
 
@@ -951,7 +781,6 @@ function pauseGame() {
   statusNode.textContent = "Пауза";
   stopLoop();
   stopRenderLoop();
-  stopBackgroundMusic();
 }
 
 function resetGame() {
