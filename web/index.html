@@ -34,13 +34,25 @@
       </section>
 
       <section class="game-shell" aria-label="Игровое поле">
-        <div class="difficulty-panel">
-          <label for="difficulty">Сложность</label>
-          <select id="difficulty">
-            <option value="easy">Легкая</option>
-            <option value="normal" selected>Нормальная</option>
-            <option value="hard">Сложная</option>
-          </select>
+        <div class="settings-panel">
+          <div class="setting-control">
+            <label for="difficulty">Сложность</label>
+            <select id="difficulty">
+              <option value="easy">Легкая</option>
+              <option value="normal" selected>Нормальная</option>
+              <option value="hard">Сложная</option>
+            </select>
+          </div>
+          <div class="setting-control">
+            <label for="snake-theme">Цвет змейки</label>
+            <select id="snake-theme">
+              <option value="neon" selected>Неон</option>
+              <option value="emerald">Изумруд</option>
+              <option value="cyber">Кибер-розовый</option>
+              <option value="arctic">Арктика</option>
+              <option value="gold">Золото</option>
+            </select>
+          </div>
         </div>
 
         <div class="board-frame">
@@ -54,15 +66,16 @@
         <button id="restart-btn" type="button" class="secondary">Рестарт</button>
       </section>
 
-      <section class="mobile-controls" aria-label="Мобильное управление">
-        <button class="mobile-control up" type="button" data-direction="ArrowUp" aria-label="Вверх">↑</button>
-        <button class="mobile-control left" type="button" data-direction="ArrowLeft" aria-label="Влево">←</button>
-        <button class="mobile-control down" type="button" data-direction="ArrowDown" aria-label="Вниз">↓</button>
-        <button class="mobile-control right" type="button" data-direction="ArrowRight" aria-label="Вправо">→</button>
+      <section class="screen-controls" aria-label="Экранное управление стрелками">
+        <span class="screen-controls-title">Экранные стрелки</span>
+        <button class="screen-control up" type="button" data-direction="ArrowUp" aria-label="Вверх">↑</button>
+        <button class="screen-control left" type="button" data-direction="ArrowLeft" aria-label="Влево">←</button>
+        <button class="screen-control down" type="button" data-direction="ArrowDown" aria-label="Вниз">↓</button>
+        <button class="screen-control right" type="button" data-direction="ArrowRight" aria-label="Вправо">→</button>
       </section>
 
       <p id="status" class="status">Нажмите "Старт", чтобы начать игру.</p>
-      <p class="hint">Управление: стрелки, WASD, свайпы или экранные кнопки на телефоне. Золотой бонус дает больше очков и исчезает быстро.</p>
+      <p class="hint">Управление: экранные стрелки, клавиатура WASD/стрелки или свайпы. Золотой бонус дает больше очков и исчезает быстро.</p>
 
       <section class="records">
         <h2>Топ-5 результатов</h2>

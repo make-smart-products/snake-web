@@ -9,6 +9,7 @@ const startBtn = document.getElementById("start-btn");
 const pauseBtn = document.getElementById("pause-btn");
 const restartBtn = document.getElementById("restart-btn");
 const difficultySelect = document.getElementById("difficulty");
+const snakeThemeSelect = document.getElementById("snake-theme");
 const topScoresNode = document.getElementById("top-scores");
 const mobileControlButtons = document.querySelectorAll("[data-direction]");
 
@@ -16,6 +17,7 @@ const gridSize = 24;
 const tileCount = canvas.width / gridSize;
 const storageKey = "snake_best_score";
 const topScoresStorageKey = "snake_top_scores";
+const snakeThemeStorageKey = "snake_theme";
 const foodsPerLevel = 4;
 const bonusEveryFoods = 5;
 const bonusLifetimeMs = 7000;
@@ -23,6 +25,48 @@ const speedByDifficulty = {
   easy: 165,
   normal: 120,
   hard: 88,
+};
+const snakePalettes = {
+  neon: {
+    headStart: "#a7f3d0",
+    headEnd: "#22d3ee",
+    bodyRgb: "52, 211, 153",
+    tailRgb: "14, 165, 233",
+    glow: "rgba(34, 211, 238, 0.65)",
+    eye: "#03111a",
+  },
+  emerald: {
+    headStart: "#bbf7d0",
+    headEnd: "#22c55e",
+    bodyRgb: "34, 197, 94",
+    tailRgb: "20, 184, 166",
+    glow: "rgba(34, 197, 94, 0.68)",
+    eye: "#052e16",
+  },
+  cyber: {
+    headStart: "#fbcfe8",
+    headEnd: "#e879f9",
+    bodyRgb: "236, 72, 153",
+    tailRgb: "168, 85, 247",
+    glow: "rgba(232, 121, 249, 0.7)",
+    eye: "#2e0038",
+  },
+  arctic: {
+    headStart: "#e0f2fe",
+    headEnd: "#38bdf8",
+    bodyRgb: "125, 211, 252",
+    tailRgb: "129, 140, 248",
+    glow: "rgba(125, 211, 252, 0.72)",
+    eye: "#082f49",
+  },
+  gold: {
+    headStart: "#fef3c7",
+    headEnd: "#f59e0b",
+    bodyRgb: "251, 191, 36",
+    tailRgb: "249, 115, 22",
+    glow: "rgba(251, 191, 36, 0.72)",
+    eye: "#451a03",
+  },
 };
 
 let snake = [{ x: 10, y: 10 }];
@@ -43,6 +87,11 @@ let touchStartX = 0;
 let touchStartY = 0;
 let particles = [];
 
+const savedSnakeTheme = localStorage.getItem(snakeThemeStorageKey);
+if (savedSnakeTheme && snakePalettes[savedSnakeTheme]) {
+  snakeThemeSelect.value = savedSnakeTheme;
+}
+
 renderTopScores();
 updateHud();
 
@@ -53,6 +102,10 @@ function getTickMs() {
 
 function getDifficultyName() {
   return difficultySelect.options[difficultySelect.selectedIndex].text;
+}
+
+function getSnakePalette() {
+  return snakePalettes[snakeThemeSelect.value] || snakePalettes.neon;
 }
 
 function updateHud() {
@@ -218,6 +271,8 @@ function drawFood(cell, isBonus = false) {
 }
 
 function drawSnake() {
+  const palette = getSnakePalette();
+
   snake.forEach((segment, index) => {
     const intensity = Math.max(0.35, 1 - index / Math.max(snake.length, 1));
     const bodyGradient = ctx.createLinearGradient(
@@ -226,16 +281,16 @@ function drawSnake() {
       segment.x * gridSize + gridSize,
       segment.y * gridSize + gridSize,
     );
-    bodyGradient.addColorStop(0, index === 0 ? "#a7f3d0" : `rgba(52, 211, 153, ${intensity})`);
-    bodyGradient.addColorStop(1, index === 0 ? "#22d3ee" : `rgba(14, 165, 233, ${intensity})`);
+    bodyGradient.addColorStop(0, index === 0 ? palette.headStart : `rgba(${palette.bodyRgb}, ${intensity})`);
+    bodyGradient.addColorStop(1, index === 0 ? palette.headEnd : `rgba(${palette.tailRgb}, ${intensity})`);
 
-    drawRoundedCell(segment.x, segment.y, bodyGradient, "rgba(34, 211, 238, 0.65)", index === 0 ? 2 : 4);
+    drawRoundedCell(segment.x, segment.y, bodyGradient, palette.glow, index === 0 ? 2 : 4);
   });
 
-  drawSnakeEyes();
+  drawSnakeEyes(palette.eye);
 }
 
-function drawSnakeEyes() {
+function drawSnakeEyes(eyeColor) {
   const head = snake[0];
   if (!head) return;
 
@@ -255,7 +310,7 @@ function drawSnakeEyes() {
         ];
 
   ctx.save();
-  ctx.fillStyle = "#03111a";
+  ctx.fillStyle = eyeColor;
   eyePositions.forEach((eye) => {
     ctx.beginPath();
     ctx.arc(eye.x, eye.y, 2.4, 0, Math.PI * 2);
@@ -491,14 +546,11 @@ document.addEventListener("keydown", (event) => {
 });
 
 mobileControlButtons.forEach((button) => {
-  const handlePress = (event) => {
+  button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     setDirection(button.dataset.direction);
     button.blur();
-  };
-
-  button.addEventListener("pointerdown", handlePress);
-  button.addEventListener("click", handlePress);
+  });
 });
 
 difficultySelect.addEventListener("change", () => {
@@ -507,6 +559,11 @@ difficultySelect.addEventListener("change", () => {
     restartLoop();
     statusNode.textContent = `Сложность изменена: ${getDifficultyName()}.`;
   }
+});
+
+snakeThemeSelect.addEventListener("change", () => {
+  localStorage.setItem(snakeThemeStorageKey, snakeThemeSelect.value);
+  draw();
 });
 
 canvas.addEventListener("touchstart", (event) => {
