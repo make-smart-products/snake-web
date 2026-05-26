@@ -334,6 +334,70 @@ button.sound-off {
   color: #cbd5e1;
 }
 
+.record-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.record-modal[hidden] {
+  display: none;
+}
+
+.record-card {
+  width: min(420px, 100%);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 28px;
+  padding: 24px;
+  background: var(--panel-strong);
+  box-shadow:
+    0 26px 90px rgba(0, 0, 0, 0.45),
+    0 0 42px rgba(251, 191, 36, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.record-card h2 {
+  margin: 0 0 10px;
+  font-size: clamp(28px, 7vw, 42px);
+  letter-spacing: -0.05em;
+}
+
+.record-score {
+  margin: 0 0 18px;
+  color: #fde68a;
+  font-weight: 800;
+}
+
+.record-card label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.record-card input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  color: var(--text);
+  background: rgba(2, 6, 23, 0.74);
+  font: inherit;
+  outline: none;
+}
+
+.record-card input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.14);
+}
+
 @media (max-width: 720px) {
   .app {
     width: min(100% - 20px, 560px);

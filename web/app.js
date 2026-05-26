@@ -13,6 +13,10 @@ const difficultySelect = document.getElementById("difficulty");
 const snakeThemeSelect = document.getElementById("snake-theme");
 const topScoresNode = document.getElementById("top-scores");
 const screenControlButtons = document.querySelectorAll("[data-direction]");
+const recordModal = document.getElementById("record-modal");
+const recordForm = document.getElementById("record-form");
+const recordScoreNode = document.getElementById("record-score");
+const playerNameInput = document.getElementById("player-name");
 
 const gridSize = 24;
 const tileCount = canvas.width / gridSize;
@@ -20,6 +24,7 @@ const storageKey = "snake_best_score";
 const topScoresStorageKey = "snake_top_scores";
 const snakeThemeStorageKey = "snake_theme";
 const soundStorageKey = "snake_sound_enabled";
+const playerNameStorageKey = "snake_player_name";
 const foodsPerLevel = 4;
 const bonusEveryFoods = 5;
 const bonusLifetimeMs = 7000;
@@ -137,6 +142,7 @@ let musicTimerId = null;
 let musicNoteIndex = 0;
 let isSoundEnabled = localStorage.getItem(soundStorageKey) !== "false";
 let lastMoveSoundAt = 0;
+let pendingRecordScore = null;
 
 const savedSnakeTheme = localStorage.getItem(snakeThemeStorageKey);
 if (savedSnakeTheme && snakePalettes[savedSnakeTheme]) {
@@ -209,7 +215,7 @@ function createFreeCell(extraCells = []) {
 function spawnFood() {
   const newFood = createFreeCell(bonusFood ? [bonusFood] : []);
   if (!newFood) {
-    gameOver("Вы заполнили все поле. Идеальная партия!");
+    gameOver({ message: "Вы заполнили все поле. Идеальная партия!" });
     return;
   }
   food = newFood;
@@ -543,7 +549,7 @@ function update() {
 
   if (bodyToCheck.some((segment) => isSameCell(segment, head))) {
     playSelfCollisionWarning();
-    gameOver();
+    gameOver({ reason: "self" });
     return;
   }
 
@@ -581,24 +587,28 @@ function update() {
   draw();
 }
 
-function gameOver(message) {
+function gameOver(options = {}) {
+  const details = typeof options === "string" ? { message: options } : options;
   stopLoop();
   stopBackgroundMusic();
   isRunning = false;
   isPaused = false;
-  statusNode.textContent = message || `Игра окончена. Ваш счет: ${score}. Нажмите "Рестарт".`;
+  statusNode.textContent = details.message || `Игра окончена. Ваш счет: ${score}. Нажмите "Рестарт".`;
 
-  if (score > bestScore) {
+  const isNewBest = score > bestScore;
+  if (isNewBest) {
     bestScore = score;
     localStorage.setItem(storageKey, String(bestScore));
   }
 
-  topScores.push(score);
-  topScores = topScores
-    .filter((value) => Number.isFinite(value) && value > 0)
-    .sort((a, b) => b - a)
-    .slice(0, 5);
-  localStorage.setItem(topScoresStorageKey, JSON.stringify(topScores));
+  if (score > 0) {
+    if (isNewBest && details.reason === "self") {
+      showRecordModal(score);
+    } else {
+      saveScoreEntry({ score, name: "Игрок" });
+    }
+  }
+
   updateHud();
   renderTopScores();
 }
@@ -659,10 +669,65 @@ function loadTopScores() {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((value) => Number.isFinite(value) && value > 0).slice(0, 5);
+    return parsed
+      .map(normalizeScoreEntry)
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
   } catch (_) {
     return [];
   }
+}
+
+function normalizeScoreEntry(entry) {
+  if (Number.isFinite(entry)) {
+    return { score: entry, name: "Игрок" };
+  }
+
+  if (!entry || typeof entry !== "object") {
+    return { score: 0, name: "Игрок" };
+  }
+
+  return {
+    score: Number.isFinite(entry.score) ? entry.score : 0,
+    name: sanitizePlayerName(entry.name),
+  };
+}
+
+function sanitizePlayerName(name) {
+  const normalizedName = String(name || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 20);
+
+  return normalizedName || "Игрок";
+}
+
+function saveScoreEntry(entry) {
+  const normalizedEntry = normalizeScoreEntry(entry);
+  if (normalizedEntry.score <= 0) return;
+
+  topScores.push(normalizedEntry);
+  topScores = topScores
+    .map(normalizeScoreEntry)
+    .filter((value) => value.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+  localStorage.setItem(topScoresStorageKey, JSON.stringify(topScores));
+  renderTopScores();
+}
+
+function showRecordModal(recordScore) {
+  pendingRecordScore = recordScore;
+  recordScoreNode.textContent = `Результат: ${recordScore}`;
+  playerNameInput.value = localStorage.getItem(playerNameStorageKey) || "";
+  recordModal.hidden = false;
+  statusNode.textContent = `Новый рекорд: ${recordScore}! Введите имя игрока.`;
+  setTimeout(() => playerNameInput.focus(), 0);
+}
+
+function hideRecordModal() {
+  recordModal.hidden = true;
 }
 
 function renderTopScores() {
@@ -674,9 +739,10 @@ function renderTopScores() {
     return;
   }
 
-  topScores.forEach((value, index) => {
+  topScores.forEach((entry) => {
+    const normalizedEntry = normalizeScoreEntry(entry);
     const li = document.createElement("li");
-    li.textContent = `${index + 1}. ${value}`;
+    li.textContent = `${normalizedEntry.name}: ${normalizedEntry.score}`;
     topScoresNode.appendChild(li);
   });
 }
@@ -760,6 +826,18 @@ canvas.addEventListener("touchend", (event) => {
   } else {
     setDirection(dy > 0 ? "ArrowDown" : "ArrowUp");
   }
+});
+
+recordForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (pendingRecordScore === null) return;
+
+  const playerName = sanitizePlayerName(playerNameInput.value);
+  localStorage.setItem(playerNameStorageKey, playerName);
+  saveScoreEntry({ score: pendingRecordScore, name: playerName });
+  statusNode.textContent = `Новый рекорд ${pendingRecordScore} сохранен для игрока ${playerName}.`;
+  pendingRecordScore = null;
+  hideRecordModal();
 });
 
 startBtn.addEventListener("click", startGame);

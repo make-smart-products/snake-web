@@ -82,6 +82,17 @@
         <h2>Топ-5 результатов</h2>
         <ol id="top-scores"></ol>
       </section>
+
+      <section id="record-modal" class="record-modal" role="dialog" aria-modal="true" aria-labelledby="record-title" hidden>
+        <form id="record-form" class="record-card">
+          <p class="eyebrow">Новый рекорд</p>
+          <h2 id="record-title">Запишите имя игрока</h2>
+          <p id="record-score" class="record-score"></p>
+          <label for="player-name">Имя</label>
+          <input id="player-name" name="player-name" type="text" maxlength="20" autocomplete="name" placeholder="Игрок" />
+          <button type="submit">Сохранить рекорд</button>
+        </form>
+      </section>
     </main>
     <script src="/app.js"></script>
   </body>
