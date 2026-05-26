@@ -11,7 +11,7 @@ const restartBtn = document.getElementById("restart-btn");
 const difficultySelect = document.getElementById("difficulty");
 const snakeThemeSelect = document.getElementById("snake-theme");
 const topScoresNode = document.getElementById("top-scores");
-const mobileControlButtons = document.querySelectorAll("[data-direction]");
+const screenControlButtons = document.querySelectorAll("[data-direction]");
 
 const gridSize = 24;
 const tileCount = canvas.width / gridSize;
@@ -86,6 +86,7 @@ let isPaused = false;
 let touchStartX = 0;
 let touchStartY = 0;
 let particles = [];
+let lastScreenControlPressAt = 0;
 
 const savedSnakeTheme = localStorage.getItem(snakeThemeStorageKey);
 if (savedSnakeTheme && snakePalettes[savedSnakeTheme]) {
@@ -545,12 +546,28 @@ document.addEventListener("keydown", (event) => {
   if (setDirection(key)) event.preventDefault();
 });
 
-mobileControlButtons.forEach((button) => {
-  button.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    setDirection(button.dataset.direction);
-    button.blur();
-  });
+function handleScreenControlPress(event, button) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const now = Date.now();
+  if (event.type === "click" && now - lastScreenControlPressAt < 350) {
+    return;
+  }
+
+  lastScreenControlPressAt = now;
+  setDirection(button.dataset.direction);
+  button.blur();
+}
+
+screenControlButtons.forEach((button) => {
+  if (window.PointerEvent) {
+    button.addEventListener("pointerdown", (event) => handleScreenControlPress(event, button));
+  } else {
+    button.addEventListener("touchstart", (event) => handleScreenControlPress(event, button), { passive: false });
+  }
+
+  button.addEventListener("click", (event) => handleScreenControlPress(event, button));
 });
 
 difficultySelect.addEventListener("change", () => {
