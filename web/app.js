@@ -4,6 +4,7 @@ const scoreNode = document.getElementById("score");
 const bestScoreNode = document.getElementById("best-score");
 const levelNode = document.getElementById("level");
 const speedNode = document.getElementById("speed");
+const levelProgressNode = document.getElementById("level-progress");
 const statusNode = document.getElementById("status");
 const startBtn = document.getElementById("start-btn");
 const pauseBtn = document.getElementById("pause-btn");
@@ -17,6 +18,9 @@ const recordModal = document.getElementById("record-modal");
 const recordForm = document.getElementById("record-form");
 const recordScoreNode = document.getElementById("record-score");
 const playerNameInput = document.getElementById("player-name");
+const victoryModal = document.getElementById("victory-modal");
+const victoryScoreNode = document.getElementById("victory-score");
+const victoryRestartBtn = document.getElementById("victory-restart-btn");
 
 const gridSize = 24;
 const tileCount = canvas.width / gridSize;
@@ -25,14 +29,11 @@ const topScoresStorageKey = "snake_top_scores";
 const snakeThemeStorageKey = "snake_theme";
 const soundStorageKey = "snake_sound_enabled";
 const playerNameStorageKey = "snake_player_name";
-const foodsPerLevel = 4;
+const maxLevel = 10;
+const pointsPerLevel = 1000;
 const bonusEveryFoods = 5;
 const bonusLifetimeMs = 7000;
-const speedByDifficulty = {
-  easy: 165,
-  normal: 120,
-  hard: 88,
-};
+const levelSpeeds = [170, 154, 138, 122, 106, 92, 80, 68, 58, 50];
 const snakePalettes = {
   neon: {
     headStart: "#a7f3d0",
@@ -127,6 +128,7 @@ let bonusFood = null;
 let bonusExpiresAt = 0;
 let score = 0;
 let level = 1;
+let levelScore = 0;
 let foodEaten = 0;
 let bestScore = Number(localStorage.getItem(storageKey) || 0);
 let topScores = loadTopScores();
@@ -143,6 +145,7 @@ let musicNoteIndex = 0;
 let isSoundEnabled = localStorage.getItem(soundStorageKey) !== "false";
 let lastMoveSoundAt = 0;
 let pendingRecordScore = null;
+let isVictory = false;
 
 const savedSnakeTheme = localStorage.getItem(snakeThemeStorageKey);
 if (savedSnakeTheme && snakePalettes[savedSnakeTheme]) {
@@ -154,8 +157,14 @@ updateHud();
 updateSoundButton();
 
 function getTickMs() {
-  const baseSpeed = speedByDifficulty[difficultySelect.value] || speedByDifficulty.normal;
-  return Math.max(52, baseSpeed - (level - 1) * 8);
+  const baseSpeed = levelSpeeds[Math.min(level - 1, levelSpeeds.length - 1)] || levelSpeeds[0];
+  const difficultyOffset = {
+    easy: 18,
+    normal: 0,
+    hard: -14,
+  }[difficultySelect.value] || 0;
+
+  return Math.max(42, baseSpeed + difficultyOffset);
 }
 
 function getDifficultyName() {
@@ -171,6 +180,7 @@ function updateHud() {
   bestScoreNode.textContent = String(bestScore);
   levelNode.textContent = String(level);
   speedNode.textContent = `${getTickMs()}ms`;
+  levelProgressNode.textContent = `${Math.min(levelScore, pointsPerLevel)}/${pointsPerLevel}`;
 }
 
 function randomCell() {
@@ -230,12 +240,26 @@ function spawnBonusFood() {
   statusNode.textContent = "На поле появился золотой бонус. Успейте забрать!";
 }
 
-function updateLevel() {
-  const nextLevel = Math.floor(foodEaten / foodsPerLevel) + 1;
-  if (nextLevel === level) return false;
+function addScore(points) {
+  score += points;
+  levelScore += points;
+}
 
-  level = nextLevel;
+function updateLevelProgress() {
+  if (levelScore < pointsPerLevel) return false;
+
+  if (level >= maxLevel) {
+    levelScore = pointsPerLevel;
+    updateHud();
+    showVictory();
+    return true;
+  }
+
+  level += 1;
+  levelScore = 0;
+  statusNode.textContent = `Набрано ${pointsPerLevel} очков! Переход на уровень ${level}.`;
   updateHud();
+  restartLoop();
   return true;
 }
 
@@ -299,6 +323,12 @@ function playMoveSound() {
 function playSelfCollisionWarning() {
   playTone(196, 0.12, "sawtooth", 0.045);
   playTone(146.83, 0.18, "sawtooth", 0.038, 0.11);
+}
+
+function playVictorySound() {
+  playTone(523.25, 0.16, "triangle", 0.045);
+  playTone(659.25, 0.18, "triangle", 0.045, 0.14);
+  playTone(783.99, 0.24, "triangle", 0.05, 0.3);
 }
 
 function stopBackgroundMusic() {
@@ -527,6 +557,18 @@ function drawParticles() {
   });
 }
 
+function createVictoryFireworks() {
+  const colors = ["#fbbf24", "#22d3ee", "#f472b6", "#34d399", "#e879f9"];
+
+  for (let burst = 0; burst < 6; burst += 1) {
+    const cell = {
+      x: 3 + Math.floor(Math.random() * (tileCount - 6)),
+      y: 3 + Math.floor(Math.random() * (tileCount - 6)),
+    };
+    createBurst(cell, colors[burst % colors.length]);
+  }
+}
+
 function draw() {
   drawBoardBackground();
   drawFood(food);
@@ -558,28 +600,34 @@ function update() {
 
   if (eatsFood || eatsBonus) {
     if (eatsFood) {
-      score += 10 * level;
+      addScore(100);
       foodEaten += 1;
       createBurst(food, "#fb7185");
       spawnFood();
     }
 
     if (eatsBonus) {
-      score += 35 * level;
+      addScore(250);
       createBurst(bonusFood, "#fbbf24");
       bonusFood = null;
     }
 
-    const leveledUp = updateLevel();
+    const progressCompleted = updateLevelProgress();
     updateHud();
+
+    if (isVictory) {
+      draw();
+      return;
+    }
 
     if (foodEaten > 0 && foodEaten % bonusEveryFoods === 0 && !bonusFood) {
       spawnBonusFood();
-    } else if (leveledUp) {
-      statusNode.textContent = `Уровень ${level}. Скорость выросла до ${getTickMs()}ms.`;
     }
 
-    if (leveledUp) restartLoop();
+    if (progressCompleted) {
+      draw();
+      return;
+    }
   } else {
     snake.pop();
   }
@@ -611,6 +659,36 @@ function gameOver(options = {}) {
 
   updateHud();
   renderTopScores();
+}
+
+function showVictory() {
+  stopLoop();
+  stopBackgroundMusic();
+  isRunning = false;
+  isPaused = false;
+  isVictory = true;
+  bonusFood = null;
+  createVictoryFireworks();
+  playVictorySound();
+  statusNode.textContent = "Ты победил! Молодец!!!";
+  victoryScoreNode.textContent = `Итоговый счет: ${score}`;
+  victoryModal.hidden = false;
+
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem(storageKey, String(bestScore));
+    updateHud();
+  }
+
+  if (score > 0) {
+    saveScoreEntry({ score, name: "Победитель" });
+  }
+
+  draw();
+}
+
+function hideVictoryModal() {
+  victoryModal.hidden = true;
 }
 
 function stopLoop() {
@@ -648,6 +726,8 @@ function pauseGame() {
 }
 
 function resetGame() {
+  hideRecordModal();
+  hideVictoryModal();
   snake = [{ x: 10, y: 10 }];
   direction = { x: 1, y: 0 };
   nextDirection = { x: 1, y: 0 };
@@ -657,7 +737,10 @@ function resetGame() {
   particles = [];
   score = 0;
   level = 1;
+  levelScore = 0;
   foodEaten = 0;
+  pendingRecordScore = null;
+  isVictory = false;
   spawnFood();
   updateHud();
   draw();
@@ -843,6 +926,11 @@ recordForm.addEventListener("submit", (event) => {
 startBtn.addEventListener("click", startGame);
 pauseBtn.addEventListener("click", pauseGame);
 restartBtn.addEventListener("click", () => {
+  resetGame();
+  startGame();
+});
+
+victoryRestartBtn.addEventListener("click", () => {
   resetGame();
   startGame();
 });

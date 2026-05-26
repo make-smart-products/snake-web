@@ -31,6 +31,10 @@
           <span class="hud-label">Скорость</span>
           <strong id="speed">120ms</strong>
         </div>
+        <div class="hud-card">
+          <span class="hud-label">Цель уровня</span>
+          <strong id="level-progress">0/1000</strong>
+        </div>
       </section>
 
       <section class="game-shell" aria-label="Игровое поле">
@@ -76,7 +80,7 @@
       </section>
 
       <p id="status" class="status">Нажмите "Старт", чтобы начать игру.</p>
-      <p class="hint">Управление: экранные стрелки, клавиатура WASD/стрелки или свайпы. Стены переносят змейку на другую сторону, а фоном играет мелодия Бетховена.</p>
+      <p class="hint">Управление: экранные стрелки, клавиатура WASD/стрелки или свайпы. Наберите 1000 очков на каждом из 10 уровней, чтобы победить.</p>
 
       <section class="records">
         <h2>Топ-5 результатов</h2>
@@ -92,6 +96,20 @@
           <input id="player-name" name="player-name" type="text" maxlength="20" autocomplete="name" placeholder="Игрок" />
           <button type="submit">Сохранить рекорд</button>
         </form>
+      </section>
+
+      <section id="victory-modal" class="victory-modal" role="dialog" aria-modal="true" aria-labelledby="victory-title" hidden>
+        <div class="victory-card">
+          <div class="fireworks" aria-hidden="true">
+            <span class="firework one"></span>
+            <span class="firework two"></span>
+            <span class="firework three"></span>
+          </div>
+          <p class="eyebrow">Финал 10 уровня</p>
+          <h2 id="victory-title">Ты победил! Молодец!!!</h2>
+          <p id="victory-score" class="record-score"></p>
+          <button id="victory-restart-btn" type="button">Играть снова</button>
+        </div>
       </section>
     </main>
     <script src="/app.js"></script>

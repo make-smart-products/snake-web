@@ -78,7 +78,7 @@ h1 {
 
 .hud {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin: 20px 0;
 }
@@ -334,7 +334,8 @@ button.sound-off {
   color: #cbd5e1;
 }
 
-.record-modal {
+.record-modal,
+.victory-modal {
   position: fixed;
   inset: 0;
   z-index: 10;
@@ -345,11 +346,15 @@ button.sound-off {
   backdrop-filter: blur(10px);
 }
 
-.record-modal[hidden] {
+.record-modal[hidden],
+.victory-modal[hidden] {
   display: none;
 }
 
-.record-card {
+.record-card,
+.victory-card {
+  position: relative;
+  overflow: hidden;
   width: min(420px, 100%);
   border: 1px solid rgba(251, 191, 36, 0.3);
   border-radius: 28px;
@@ -362,10 +367,84 @@ button.sound-off {
   text-align: left;
 }
 
-.record-card h2 {
+.record-card h2,
+.victory-card h2 {
+  position: relative;
+  z-index: 1;
   margin: 0 0 10px;
   font-size: clamp(28px, 7vw, 42px);
   letter-spacing: -0.05em;
+}
+
+.victory-card {
+  min-height: 330px;
+  text-align: center;
+}
+
+.victory-card .eyebrow,
+.victory-card .record-score,
+.victory-card button {
+  position: relative;
+  z-index: 1;
+}
+
+.fireworks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.firework {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  animation: firework-burst 1400ms ease-out infinite;
+  box-shadow:
+    0 -54px 0 #fef3c7,
+    38px -38px 0 #22d3ee,
+    54px 0 0 #f472b6,
+    38px 38px 0 #34d399,
+    0 54px 0 #fbbf24,
+    -38px 38px 0 #38bdf8,
+    -54px 0 0 #e879f9,
+    -38px -38px 0 #a7f3d0;
+}
+
+.firework.one {
+  top: 34%;
+  left: 26%;
+  background: #fbbf24;
+}
+
+.firework.two {
+  top: 24%;
+  right: 24%;
+  background: #22d3ee;
+  animation-delay: 280ms;
+}
+
+.firework.three {
+  right: 38%;
+  bottom: 26%;
+  background: #f472b6;
+  animation-delay: 560ms;
+}
+
+@keyframes firework-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.15) rotate(0deg);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.35) rotate(18deg);
+  }
 }
 
 .record-score {
@@ -396,6 +475,13 @@ button.sound-off {
 .record-card input:focus {
   border-color: var(--amber);
   box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .firework {
+    animation: none;
+    opacity: 0.75;
+  }
 }
 
 @media (max-width: 720px) {
