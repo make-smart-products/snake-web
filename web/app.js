@@ -10,6 +10,7 @@ const pauseBtn = document.getElementById("pause-btn");
 const restartBtn = document.getElementById("restart-btn");
 const difficultySelect = document.getElementById("difficulty");
 const topScoresNode = document.getElementById("top-scores");
+const mobileControlButtons = document.querySelectorAll("[data-direction]");
 
 const gridSize = 24;
 const tileCount = canvas.width / gridSize;
@@ -487,6 +488,17 @@ function setDirection(key) {
 document.addEventListener("keydown", (event) => {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
   if (setDirection(key)) event.preventDefault();
+});
+
+mobileControlButtons.forEach((button) => {
+  const handlePress = (event) => {
+    event.preventDefault();
+    setDirection(button.dataset.direction);
+    button.blur();
+  };
+
+  button.addEventListener("pointerdown", handlePress);
+  button.addEventListener("click", handlePress);
 });
 
 difficultySelect.addEventListener("change", () => {
