@@ -8,6 +8,7 @@ const statusNode = document.getElementById("status");
 const startBtn = document.getElementById("start-btn");
 const pauseBtn = document.getElementById("pause-btn");
 const restartBtn = document.getElementById("restart-btn");
+const soundBtn = document.getElementById("sound-btn");
 const difficultySelect = document.getElementById("difficulty");
 const snakeThemeSelect = document.getElementById("snake-theme");
 const topScoresNode = document.getElementById("top-scores");
@@ -18,6 +19,7 @@ const tileCount = canvas.width / gridSize;
 const storageKey = "snake_best_score";
 const topScoresStorageKey = "snake_top_scores";
 const snakeThemeStorageKey = "snake_theme";
+const soundStorageKey = "snake_sound_enabled";
 const foodsPerLevel = 4;
 const bonusEveryFoods = 5;
 const bonusLifetimeMs = 7000;
@@ -68,6 +70,49 @@ const snakePalettes = {
     eye: "#451a03",
   },
 };
+const noteFrequencies = {
+  C4: 261.63,
+  D4: 293.66,
+  E4: 329.63,
+  F4: 349.23,
+  G4: 392,
+  A4: 440,
+  B4: 493.88,
+  C5: 523.25,
+};
+const odeToJoyMelody = [
+  ["E4", 1],
+  ["E4", 1],
+  ["F4", 1],
+  ["G4", 1],
+  ["G4", 1],
+  ["F4", 1],
+  ["E4", 1],
+  ["D4", 1],
+  ["C4", 1],
+  ["C4", 1],
+  ["D4", 1],
+  ["E4", 1],
+  ["E4", 1.5],
+  ["D4", 0.5],
+  ["D4", 2],
+  ["E4", 1],
+  ["E4", 1],
+  ["F4", 1],
+  ["G4", 1],
+  ["G4", 1],
+  ["F4", 1],
+  ["E4", 1],
+  ["D4", 1],
+  ["C4", 1],
+  ["C4", 1],
+  ["D4", 1],
+  ["E4", 1],
+  ["D4", 1.5],
+  ["C4", 0.5],
+  ["C4", 2],
+];
+const musicBeatMs = 360;
 
 let snake = [{ x: 10, y: 10 }];
 let direction = { x: 1, y: 0 };
@@ -87,6 +132,11 @@ let touchStartX = 0;
 let touchStartY = 0;
 let particles = [];
 let lastScreenControlPressAt = 0;
+let audioContext = null;
+let musicTimerId = null;
+let musicNoteIndex = 0;
+let isSoundEnabled = localStorage.getItem(soundStorageKey) !== "false";
+let lastMoveSoundAt = 0;
 
 const savedSnakeTheme = localStorage.getItem(snakeThemeStorageKey);
 if (savedSnakeTheme && snakePalettes[savedSnakeTheme]) {
@@ -95,6 +145,7 @@ if (savedSnakeTheme && snakePalettes[savedSnakeTheme]) {
 
 renderTopScores();
 updateHud();
+updateSoundButton();
 
 function getTickMs() {
   const baseSpeed = speedByDifficulty[difficultySelect.value] || speedByDifficulty.normal;
@@ -122,6 +173,13 @@ function randomCell() {
 
 function isSameCell(a, b) {
   return Boolean(a && b && a.x === b.x && a.y === b.y);
+}
+
+function wrapCell(cell) {
+  return {
+    x: (cell.x + tileCount) % tileCount,
+    y: (cell.y + tileCount) % tileCount,
+  };
 }
 
 function isOccupied(cell, extraCells = []) {
@@ -180,6 +238,107 @@ function restartLoop() {
 
   stopLoop();
   gameLoopId = setInterval(update, getTickMs());
+}
+
+function updateSoundButton() {
+  soundBtn.textContent = isSoundEnabled ? "Звук: вкл" : "Звук: выкл";
+  soundBtn.classList.toggle("sound-off", !isSoundEnabled);
+}
+
+function getAudioContext() {
+  if (!isSoundEnabled) return null;
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+
+  if (audioContext.state === "suspended") {
+    audioContext.resume();
+  }
+
+  return audioContext;
+}
+
+function playTone(frequency, durationSeconds, type = "sine", volume = 0.04, startDelaySeconds = 0) {
+  const context = getAudioContext();
+  if (!context) return;
+
+  const startTime = context.currentTime + startDelaySeconds;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + durationSeconds);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + durationSeconds + 0.02);
+}
+
+function playMoveSound() {
+  const now = Date.now();
+  if (now - lastMoveSoundAt < 45) return;
+
+  lastMoveSoundAt = now;
+  playTone(440 + level * 14, 0.035, "triangle", 0.018);
+}
+
+function playSelfCollisionWarning() {
+  playTone(196, 0.12, "sawtooth", 0.045);
+  playTone(146.83, 0.18, "sawtooth", 0.038, 0.11);
+}
+
+function stopBackgroundMusic() {
+  if (musicTimerId) {
+    clearTimeout(musicTimerId);
+    musicTimerId = null;
+  }
+}
+
+function scheduleBackgroundMusic() {
+  if (!isSoundEnabled || !isRunning || isPaused) {
+    stopBackgroundMusic();
+    return;
+  }
+
+  const [noteName, beats] = odeToJoyMelody[musicNoteIndex];
+  const durationMs = musicBeatMs * beats;
+  const frequency = noteFrequencies[noteName];
+
+  if (frequency) {
+    playTone(frequency, Math.max(0.12, durationMs / 1000 - 0.05), "sine", 0.015);
+    playTone(frequency / 2, Math.max(0.12, durationMs / 1000 - 0.05), "triangle", 0.008);
+  }
+
+  musicNoteIndex = (musicNoteIndex + 1) % odeToJoyMelody.length;
+  musicTimerId = setTimeout(scheduleBackgroundMusic, durationMs);
+}
+
+function startBackgroundMusic() {
+  if (!isSoundEnabled || musicTimerId) return;
+
+  getAudioContext();
+  scheduleBackgroundMusic();
+}
+
+function setSoundEnabled(enabled) {
+  isSoundEnabled = enabled;
+  localStorage.setItem(soundStorageKey, String(isSoundEnabled));
+  updateSoundButton();
+
+  if (isSoundEnabled && isRunning && !isPaused) {
+    startBackgroundMusic();
+    return;
+  }
+
+  stopBackgroundMusic();
 }
 
 function roundedRect(x, y, width, height, radius) {
@@ -376,23 +535,20 @@ function update() {
   }
 
   direction = nextDirection;
-  const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
-
-  if (head.x < 0 || head.y < 0 || head.x >= tileCount || head.y >= tileCount) {
-    gameOver();
-    return;
-  }
+  const head = wrapCell({ x: snake[0].x + direction.x, y: snake[0].y + direction.y });
 
   const eatsFood = isSameCell(head, food);
   const eatsBonus = isSameCell(head, bonusFood);
   const bodyToCheck = eatsFood || eatsBonus ? snake : snake.slice(0, -1);
 
   if (bodyToCheck.some((segment) => isSameCell(segment, head))) {
+    playSelfCollisionWarning();
     gameOver();
     return;
   }
 
   snake.unshift(head);
+  playMoveSound();
 
   if (eatsFood || eatsBonus) {
     if (eatsFood) {
@@ -427,6 +583,7 @@ function update() {
 
 function gameOver(message) {
   stopLoop();
+  stopBackgroundMusic();
   isRunning = false;
   isPaused = false;
   statusNode.textContent = message || `Игра окончена. Ваш счет: ${score}. Нажмите "Рестарт".`;
@@ -461,6 +618,7 @@ function startGame() {
   isPaused = false;
   statusNode.textContent = `Игра идет: ${getDifficultyName()}, уровень ${level}.`;
   restartLoop();
+  startBackgroundMusic();
 }
 
 function pauseGame() {
@@ -469,12 +627,14 @@ function pauseGame() {
     isPaused = false;
     statusNode.textContent = `Игра идет: ${getDifficultyName()}, уровень ${level}.`;
     restartLoop();
+    startBackgroundMusic();
     return;
   }
 
   isPaused = true;
   statusNode.textContent = "Пауза";
   stopLoop();
+  stopBackgroundMusic();
 }
 
 function resetGame() {
@@ -607,6 +767,10 @@ pauseBtn.addEventListener("click", pauseGame);
 restartBtn.addEventListener("click", () => {
   resetGame();
   startGame();
+});
+
+soundBtn.addEventListener("click", () => {
+  setSoundEnabled(!isSoundEnabled);
 });
 
 resetGame();
