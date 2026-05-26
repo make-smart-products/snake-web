@@ -10,7 +10,7 @@ const startBtn = document.getElementById("start-btn");
 const pauseBtn = document.getElementById("pause-btn");
 const restartBtn = document.getElementById("restart-btn");
 const soundBtn = document.getElementById("sound-btn");
-const difficultySelect = document.getElementById("difficulty");
+const resetStatsBtn = document.getElementById("reset-stats-btn");
 const snakeThemeSelect = document.getElementById("snake-theme");
 const topScoresNode = document.getElementById("top-scores");
 const screenControlButtons = document.querySelectorAll("[data-direction]");
@@ -30,10 +30,10 @@ const snakeThemeStorageKey = "snake_theme";
 const soundStorageKey = "snake_sound_enabled";
 const playerNameStorageKey = "snake_player_name";
 const maxLevel = 10;
-const pointsPerLevel = 1000;
+const pointsPerLevel = 100;
 const bonusEveryFoods = 5;
 const bonusLifetimeMs = 7000;
-const levelSpeeds = [170, 154, 138, 122, 106, 92, 80, 68, 58, 50];
+const levelSpeeds = [320, 280, 245, 215, 185, 160, 135, 112, 92, 74];
 const snakePalettes = {
   neon: {
     headStart: "#a7f3d0",
@@ -121,6 +121,7 @@ const odeToJoyMelody = [
 const musicBeatMs = 360;
 
 let snake = [{ x: 10, y: 10 }];
+let previousSnake = [{ x: 10, y: 10 }];
 let direction = { x: 1, y: 0 };
 let nextDirection = { x: 1, y: 0 };
 let food = { x: 15, y: 10 };
@@ -133,6 +134,8 @@ let foodEaten = 0;
 let bestScore = Number(localStorage.getItem(storageKey) || 0);
 let topScores = loadTopScores();
 let gameLoopId = null;
+let renderLoopId = null;
+let lastStepAt = performance.now();
 let isRunning = false;
 let isPaused = false;
 let touchStartX = 0;
@@ -158,17 +161,7 @@ updateSoundButton();
 
 function getTickMs() {
   const baseSpeed = levelSpeeds[Math.min(level - 1, levelSpeeds.length - 1)] || levelSpeeds[0];
-  const difficultyOffset = {
-    easy: 18,
-    normal: 0,
-    hard: -14,
-  }[difficultySelect.value] || 0;
-
-  return Math.max(42, baseSpeed + difficultyOffset);
-}
-
-function getDifficultyName() {
-  return difficultySelect.options[difficultySelect.selectedIndex].text;
+  return baseSpeed;
 }
 
 function getSnakePalette() {
@@ -191,11 +184,41 @@ function isSameCell(a, b) {
   return Boolean(a && b && a.x === b.x && a.y === b.y);
 }
 
+function cloneSnake() {
+  return snake.map((segment) => ({ ...segment }));
+}
+
 function wrapCell(cell) {
   return {
     x: (cell.x + tileCount) % tileCount,
     y: (cell.y + tileCount) % tileCount,
   };
+}
+
+function wrapCoordinate(value) {
+  return (value + tileCount) % tileCount;
+}
+
+function getInterpolatedCell(fromCell, toCell, progress) {
+  if (!fromCell) return toCell;
+
+  let dx = toCell.x - fromCell.x;
+  let dy = toCell.y - fromCell.y;
+
+  if (dx > tileCount / 2) dx -= tileCount;
+  if (dx < -tileCount / 2) dx += tileCount;
+  if (dy > tileCount / 2) dy -= tileCount;
+  if (dy < -tileCount / 2) dy += tileCount;
+
+  return {
+    x: wrapCoordinate(fromCell.x + dx * progress),
+    y: wrapCoordinate(fromCell.y + dy * progress),
+  };
+}
+
+function getAnimationProgress() {
+  if (!isRunning || isPaused) return 1;
+  return Math.min(1, (performance.now() - lastStepAt) / getTickMs());
 }
 
 function isOccupied(cell, extraCells = []) {
@@ -267,7 +290,9 @@ function restartLoop() {
   if (!isRunning || isPaused) return;
 
   stopLoop();
+  lastStepAt = performance.now();
   gameLoopId = setInterval(update, getTickMs());
+  startRenderLoop();
 }
 
 function updateSoundButton() {
@@ -468,26 +493,27 @@ function drawFood(cell, isBonus = false) {
 
 function drawSnake() {
   const palette = getSnakePalette();
+  const progress = getAnimationProgress();
 
   snake.forEach((segment, index) => {
+    const drawSegment = getInterpolatedCell(previousSnake[index], segment, progress);
     const intensity = Math.max(0.35, 1 - index / Math.max(snake.length, 1));
     const bodyGradient = ctx.createLinearGradient(
-      segment.x * gridSize,
-      segment.y * gridSize,
-      segment.x * gridSize + gridSize,
-      segment.y * gridSize + gridSize,
+      drawSegment.x * gridSize,
+      drawSegment.y * gridSize,
+      drawSegment.x * gridSize + gridSize,
+      drawSegment.y * gridSize + gridSize,
     );
     bodyGradient.addColorStop(0, index === 0 ? palette.headStart : `rgba(${palette.bodyRgb}, ${intensity})`);
     bodyGradient.addColorStop(1, index === 0 ? palette.headEnd : `rgba(${palette.tailRgb}, ${intensity})`);
 
-    drawRoundedCell(segment.x, segment.y, bodyGradient, palette.glow, index === 0 ? 2 : 4);
+    drawRoundedCell(drawSegment.x, drawSegment.y, bodyGradient, palette.glow, index === 0 ? 2 : 4);
   });
 
-  drawSnakeEyes(palette.eye);
+  drawSnakeEyes(palette.eye, getInterpolatedCell(previousSnake[0], snake[0], progress));
 }
 
-function drawSnakeEyes(eyeColor) {
-  const head = snake[0];
+function drawSnakeEyes(eyeColor, head = snake[0]) {
   if (!head) return;
 
   const centerX = head.x * gridSize + gridSize / 2;
@@ -577,11 +603,30 @@ function draw() {
   drawParticles();
 }
 
+function startRenderLoop() {
+  if (renderLoopId) return;
+
+  const renderFrame = () => {
+    draw();
+    renderLoopId = requestAnimationFrame(renderFrame);
+  };
+
+  renderLoopId = requestAnimationFrame(renderFrame);
+}
+
+function stopRenderLoop() {
+  if (!renderLoopId) return;
+
+  cancelAnimationFrame(renderLoopId);
+  renderLoopId = null;
+}
+
 function update() {
   if (bonusFood && Date.now() > bonusExpiresAt) {
     bonusFood = null;
   }
 
+  previousSnake = cloneSnake();
   direction = nextDirection;
   const head = wrapCell({ x: snake[0].x + direction.x, y: snake[0].y + direction.y });
 
@@ -596,18 +641,19 @@ function update() {
   }
 
   snake.unshift(head);
+  lastStepAt = performance.now();
   playMoveSound();
 
   if (eatsFood || eatsBonus) {
     if (eatsFood) {
-      addScore(100);
+      addScore(10);
       foodEaten += 1;
       createBurst(food, "#fb7185");
       spawnFood();
     }
 
     if (eatsBonus) {
-      addScore(250);
+      addScore(25);
       createBurst(bonusFood, "#fbbf24");
       bonusFood = null;
     }
@@ -638,6 +684,7 @@ function update() {
 function gameOver(options = {}) {
   const details = typeof options === "string" ? { message: options } : options;
   stopLoop();
+  stopRenderLoop();
   stopBackgroundMusic();
   isRunning = false;
   isPaused = false;
@@ -663,6 +710,7 @@ function gameOver(options = {}) {
 
 function showVictory() {
   stopLoop();
+  stopRenderLoop();
   stopBackgroundMusic();
   isRunning = false;
   isPaused = false;
@@ -704,7 +752,7 @@ function startGame() {
 
   isRunning = true;
   isPaused = false;
-  statusNode.textContent = `Игра идет: ${getDifficultyName()}, уровень ${level}.`;
+  statusNode.textContent = `Игра идет: уровень ${level}.`;
   restartLoop();
   startBackgroundMusic();
 }
@@ -713,7 +761,7 @@ function pauseGame() {
   if (!isRunning) return;
   if (isPaused) {
     isPaused = false;
-    statusNode.textContent = `Игра идет: ${getDifficultyName()}, уровень ${level}.`;
+    statusNode.textContent = `Игра идет: уровень ${level}.`;
     restartLoop();
     startBackgroundMusic();
     return;
@@ -722,13 +770,19 @@ function pauseGame() {
   isPaused = true;
   statusNode.textContent = "Пауза";
   stopLoop();
+  stopRenderLoop();
   stopBackgroundMusic();
 }
 
 function resetGame() {
   hideRecordModal();
   hideVictoryModal();
+  stopLoop();
+  stopRenderLoop();
+  isRunning = false;
+  isPaused = false;
   snake = [{ x: 10, y: 10 }];
+  previousSnake = cloneSnake();
   direction = { x: 1, y: 0 };
   nextDirection = { x: 1, y: 0 };
   food = { x: 15, y: 10 };
@@ -741,6 +795,7 @@ function resetGame() {
   foodEaten = 0;
   pendingRecordScore = null;
   isVictory = false;
+  lastStepAt = performance.now();
   spawnFood();
   updateHud();
   draw();
@@ -798,6 +853,19 @@ function saveScoreEntry(entry) {
     .slice(0, 5);
   localStorage.setItem(topScoresStorageKey, JSON.stringify(topScores));
   renderTopScores();
+}
+
+function resetStatistics() {
+  localStorage.removeItem(storageKey);
+  localStorage.removeItem(topScoresStorageKey);
+  localStorage.removeItem(playerNameStorageKey);
+  bestScore = 0;
+  topScores = [];
+  pendingRecordScore = null;
+  hideRecordModal();
+  updateHud();
+  renderTopScores();
+  statusNode.textContent = "Статистика сброшена: рекорд, топ результатов и имя игрока очищены.";
 }
 
 function showRecordModal(recordScore) {
@@ -879,14 +947,6 @@ screenControlButtons.forEach((button) => {
   button.addEventListener("click", (event) => handleScreenControlPress(event, button));
 });
 
-difficultySelect.addEventListener("change", () => {
-  updateHud();
-  if (isRunning && !isPaused) {
-    restartLoop();
-    statusNode.textContent = `Сложность изменена: ${getDifficultyName()}.`;
-  }
-});
-
 snakeThemeSelect.addEventListener("change", () => {
   localStorage.setItem(snakeThemeStorageKey, snakeThemeSelect.value);
   draw();
@@ -937,6 +997,12 @@ victoryRestartBtn.addEventListener("click", () => {
 
 soundBtn.addEventListener("click", () => {
   setSoundEnabled(!isSoundEnabled);
+});
+
+resetStatsBtn.addEventListener("click", () => {
+  if (window.confirm("Сбросить рекорд, топ результатов и сохраненное имя игрока?")) {
+    resetStatistics();
+  }
 });
 
 resetGame();

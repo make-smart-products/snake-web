@@ -33,20 +33,12 @@
         </div>
         <div class="hud-card">
           <span class="hud-label">Цель уровня</span>
-          <strong id="level-progress">0/1000</strong>
+          <strong id="level-progress">0/100</strong>
         </div>
       </section>
 
       <section class="game-shell" aria-label="Игровое поле">
         <div class="settings-panel">
-          <div class="setting-control">
-            <label for="difficulty">Сложность</label>
-            <select id="difficulty">
-              <option value="easy">Легкая</option>
-              <option value="normal" selected>Нормальная</option>
-              <option value="hard">Сложная</option>
-            </select>
-          </div>
           <div class="setting-control">
             <label for="snake-theme">Цвет змейки</label>
             <select id="snake-theme">
@@ -69,6 +61,7 @@
         <button id="pause-btn" type="button" class="secondary">Пауза</button>
         <button id="restart-btn" type="button" class="secondary">Рестарт</button>
         <button id="sound-btn" type="button" class="secondary">Звук: вкл</button>
+        <button id="reset-stats-btn" type="button" class="secondary danger">Сброс статистики</button>
       </section>
 
       <section class="screen-controls" aria-label="Экранное управление стрелками">
@@ -80,7 +73,7 @@
       </section>
 
       <p id="status" class="status">Нажмите "Старт", чтобы начать игру.</p>
-      <p class="hint">Управление: экранные стрелки, клавиатура WASD/стрелки или свайпы. Наберите 1000 очков на каждом из 10 уровней, чтобы победить.</p>
+      <p class="hint">Управление: экранные стрелки, клавиатура WASD/стрелки или свайпы. Наберите 100 очков на каждом из 10 уровней, чтобы победить.</p>
 
       <section class="records">
         <h2>Топ-5 результатов</h2>
