@@ -10,7 +10,6 @@ const startBtn = document.getElementById("start-btn");
 const pauseBtn = document.getElementById("pause-btn");
 const restartBtn = document.getElementById("restart-btn");
 const soundBtn = document.getElementById("sound-btn");
-const resetStatsBtn = document.getElementById("reset-stats-btn");
 const snakeThemeSelect = document.getElementById("snake-theme");
 const topScoresNode = document.getElementById("top-scores");
 const screenControlButtons = document.querySelectorAll("[data-direction]");
@@ -29,7 +28,6 @@ const topScoresStorageKey = "snake_top_scores";
 const snakeThemeStorageKey = "snake_theme";
 const soundStorageKey = "snake_sound_enabled";
 const playerNameStorageKey = "snake_player_name";
-const resetStatsPassword = "2026";
 const maxLevel = 10;
 const pointsPerLevel = 100;
 const bonusEveryFoods = 5;
@@ -208,6 +206,7 @@ let snake = [{ x: 10, y: 10 }];
 let previousSnake = [{ x: 10, y: 10 }];
 let direction = { x: 1, y: 0 };
 let nextDirection = { x: 1, y: 0 };
+let pendingGrowthSegments = 0;
 let food = { x: 15, y: 10 };
 let bonusFood = null;
 let bonusExpiresAt = 0;
@@ -236,6 +235,7 @@ let isVictory = false;
 let heldDirectionKey = null;
 let holdBoostTimerId = null;
 let isHoldBoostActive = false;
+let explosionTimerId = null;
 
 const savedSnakeTheme = localStorage.getItem(snakeThemeStorageKey);
 if (savedSnakeTheme && snakePalettes[savedSnakeTheme]) {
@@ -555,15 +555,16 @@ function drawRoundedCell(x, y, fillStyle, glowColor, inset = 3) {
 }
 
 function drawBoardBackground() {
+  const hue = (performance.now() * 0.012 + level * 28) % 360;
   const background = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  background.addColorStop(0, "#06111f");
-  background.addColorStop(0.5, "#071827");
-  background.addColorStop(1, "#111022");
+  background.addColorStop(0, `hsl(${hue} 72% 9%)`);
+  background.addColorStop(0.5, `hsl(${(hue + 42) % 360} 68% 11%)`);
+  background.addColorStop(1, `hsl(${(hue + 92) % 360} 72% 10%)`);
   ctx.fillStyle = background;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.save();
-  ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
+  ctx.strokeStyle = `hsla(${(hue + 180) % 360}, 80%, 74%, 0.08)`;
   ctx.lineWidth = 1;
   for (let position = gridSize; position < canvas.width; position += gridSize) {
     ctx.beginPath();
@@ -688,12 +689,44 @@ function createBurst(cell, color) {
   }
 }
 
+function createSnakeExplosion(collisionCell) {
+  const palette = getSnakePalette();
+  const colors = [palette.headStart, palette.headEnd, "#f87171", "#fbbf24", "#e2e8f0"];
+  const sourceSnake = snake.length > 0 ? snake : [collisionCell];
+
+  sourceSnake.forEach((segment, segmentIndex) => {
+    const centerX = segment.x * gridSize + gridSize / 2;
+    const centerY = segment.y * gridSize + gridSize / 2;
+    const pieces = segmentIndex === 0 ? 12 : 5;
+
+    for (let index = 0; index < pieces; index += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.6 + Math.random() * 4.2;
+      particles.push({
+        x: centerX + (Math.random() - 0.5) * 8,
+        y: centerY + (Math.random() - 0.5) * 8,
+        dx: Math.cos(angle) * speed,
+        dy: Math.sin(angle) * speed,
+        size: 1.5 + Math.random() * 3.5,
+        life: 42 + Math.floor(Math.random() * 28),
+        maxLife: 70,
+        color: colors[(segmentIndex + index) % colors.length],
+      });
+    }
+  });
+
+  createBurst(collisionCell, "#f87171");
+  snake = [];
+  previousSnake = [];
+}
+
 function drawParticles() {
   particles = particles
     .map((particle) => ({
       ...particle,
       x: particle.x + particle.dx,
       y: particle.y + particle.dy,
+      dx: particle.dx * 0.985,
       dy: particle.dy + 0.03,
       life: particle.life - 1,
     }))
@@ -763,6 +796,7 @@ function update() {
 
   if (bodyToCheck.some((segment) => isSameCell(segment, head))) {
     playSelfCollisionWarning();
+    createSnakeExplosion(head);
     gameOver({ reason: "self" });
     return;
   }
@@ -774,6 +808,7 @@ function update() {
   if (eatsFood || eatsBonus) {
     if (eatsFood) {
       addScore(10);
+      pendingGrowthSegments += 1;
       foodEaten += 1;
       createBurst(food, "#fb7185");
       spawnFood();
@@ -781,6 +816,7 @@ function update() {
 
     if (eatsBonus) {
       addScore(25);
+      pendingGrowthSegments += 2;
       createBurst(bonusFood, "#fbbf24");
       bonusFood = null;
     }
@@ -801,6 +837,10 @@ function update() {
       draw();
       return;
     }
+  }
+
+  if (pendingGrowthSegments > 0) {
+    pendingGrowthSegments -= 1;
   } else {
     snake.pop();
   }
@@ -812,7 +852,17 @@ function gameOver(options = {}) {
   const details = typeof options === "string" ? { message: options } : options;
   clearHoldBoost();
   stopLoop();
-  stopRenderLoop();
+  if (details.reason === "self") {
+    startRenderLoop();
+    if (explosionTimerId) clearTimeout(explosionTimerId);
+    explosionTimerId = setTimeout(() => {
+      stopRenderLoop();
+      explosionTimerId = null;
+      draw();
+    }, 1800);
+  } else {
+    stopRenderLoop();
+  }
   stopBackgroundMusic();
   isRunning = false;
   isPaused = false;
@@ -908,6 +958,10 @@ function resetGame() {
   hideRecordModal();
   hideVictoryModal();
   clearHoldBoost();
+  if (explosionTimerId) {
+    clearTimeout(explosionTimerId);
+    explosionTimerId = null;
+  }
   stopLoop();
   stopRenderLoop();
   isRunning = false;
@@ -916,6 +970,7 @@ function resetGame() {
   previousSnake = cloneSnake();
   direction = { x: 1, y: 0 };
   nextDirection = { x: 1, y: 0 };
+  pendingGrowthSegments = 0;
   food = { x: 15, y: 10 };
   bonusFood = null;
   bonusExpiresAt = 0;
@@ -984,19 +1039,6 @@ function saveScoreEntry(entry) {
     .slice(0, 5);
   localStorage.setItem(topScoresStorageKey, JSON.stringify(topScores));
   renderTopScores();
-}
-
-function resetStatistics() {
-  localStorage.removeItem(storageKey);
-  localStorage.removeItem(topScoresStorageKey);
-  localStorage.removeItem(playerNameStorageKey);
-  bestScore = 0;
-  topScores = [];
-  pendingRecordScore = null;
-  hideRecordModal();
-  updateHud();
-  renderTopScores();
-  statusNode.textContent = "Статистика сброшена: рекорд, топ результатов и имя игрока очищены.";
 }
 
 function showRecordModal(recordScore) {
@@ -1163,20 +1205,6 @@ victoryRestartBtn.addEventListener("click", () => {
 
 soundBtn.addEventListener("click", () => {
   setSoundEnabled(!isSoundEnabled);
-});
-
-resetStatsBtn.addEventListener("click", () => {
-  const enteredPassword = window.prompt("Введите пароль для сброса статистики:");
-  if (enteredPassword === null) return;
-
-  if (enteredPassword !== resetStatsPassword) {
-    statusNode.textContent = "Неверный пароль. Статистика не сброшена.";
-    return;
-  }
-
-  if (window.confirm("Сбросить рекорд, топ результатов и сохраненное имя игрока?")) {
-    resetStatistics();
-  }
 });
 
 resetGame();
